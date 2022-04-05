@@ -55,6 +55,9 @@ type alias TurnProgress =
     , toMoveHint: Maybe Int
     }
 
+update: GameState -> Direction -> GameState
+update state direction = { state | entities = moveLetters state.entities direction }
+
 moveLetters: Array Entity -> Direction -> Array Entity
 moveLetters entities direction =
     let
@@ -62,9 +65,7 @@ moveLetters entities direction =
                               Letter _ -> True
                               _ -> False
         canMove = Array.filter isLetter entities
-                |> Array.map .ix
-                |> Array.toList
-                |> Set.fromList
+                |> Array.map .ix |> Array.toList |> Set.fromList
 
         initProgress = TurnProgress Set.empty canMove Nothing
         (_, entities_) = hMoveLetters entities direction initProgress
@@ -185,17 +186,17 @@ makeEntities: List (EntityType, Coordinate) -> Array Entity
 makeEntities entities = List.indexedMap (\ix (t, l) -> Entity ix t l False) entities
                       |> Array.fromList
 
-testGrid = Grid 3 3
+testGrid = Grid 5 5
 
 testEntities = makeEntities [(Letter 'A', Coordinate 0 0)
                             ,(Letter 'B', Coordinate 0 1)]
 
 initialGameState = GameState testGrid testEntities
 
-showGameState: GameState -> String
+showGameState: GameState -> List (List Char)
 showGameState state =
     let
-        gridRows = Array.repeat state.grid.columns '.'
+        gridRows = Array.repeat state.grid.columns ' '
                  |> Array.repeat state.grid.rows
 
         addEntity: Entity -> Array (Array Char) -> Array (Array Char)
@@ -203,7 +204,7 @@ showGameState state =
             let
                 eChar = case entity.eType of
                             Letter ch -> ch
-                            _ -> '.'
+                            _ -> ' '
 
                 oldRow = Array.get entity.location.row rows
                 newRow = case oldRow of
@@ -217,9 +218,6 @@ showGameState state =
         gridRows_= Array.foldr addEntity gridRows state.entities
 
         grid = Array.map (Array.toList) gridRows_ |> Array.toList
-    in
-        List.intersperse [' '] grid
-        |> List.concat
-        |> String.fromList
+    in grid
 
 showEntities entities = showGameState (GameState testGrid entities)
