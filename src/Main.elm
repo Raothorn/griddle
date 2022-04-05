@@ -35,10 +35,10 @@ update msg model =
                 HandleKeyboardEvent event ->
                     let
                         direction = case event.keyCode of
-                                     Keyboard.Down -> Just GameState.Down
-                                     Keyboard.Up -> Just GameState.Up
-                                     Keyboard.Left -> Just GameState.Left
-                                     Keyboard.Right -> Just GameState.Right
+                                     Keyboard.S -> Just GameState.Down
+                                     Keyboard.W -> Just GameState.Up
+                                     Keyboard.A -> Just GameState.Left
+                                     Keyboard.D -> Just GameState.Right
                                      _    -> Nothing
 
                     in case direction of

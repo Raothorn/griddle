@@ -17,8 +17,8 @@ type alias Grid =
     }
 
 inBounds: Grid -> Coordinate -> Bool
-inBounds grid location = location.row > 0
-                         && location.column > 0
+inBounds grid location = location.row >= 0
+                         && location.column >= 0
                          && location.row < grid.rows
                          && location.column < grid.columns
 
@@ -46,119 +46,105 @@ entityAtLocation entities location =
 ----------------
 -- Turn Logic --
 ----------------
-type TurnState = InProgress TurnProgress
-               | Finished
-
-type alias TurnProgress =
-    { hasMoved: Set Int
-    , canMove:  Set Int
-    , toMoveHint: Maybe Int
+type alias Move =
+    { entityIx: Int
+    , direction: Direction
     }
 
 update: GameState -> Direction -> GameState
-update state direction = { state | entities = moveLetters state.entities direction }
-
-moveLetters: Array Entity -> Direction -> Array Entity
-moveLetters entities direction =
+update state direction =
     let
-        isLetter entity = case entity.eType of
+        isLetter entity = case entity.eType  of
                               Letter _ -> True
                               _ -> False
-        canMove = Array.filter isLetter entities
-                |> Array.map .ix |> Array.toList |> Set.fromList
+        letters = Array.filter isLetter state.entities
+        initMoveStack = Array.map (\e -> Move e.ix direction) letters
+                      |> Array.toList
 
-        initProgress = TurnProgress Set.empty canMove Nothing
-        (_, entities_) = hMoveLetters entities direction initProgress
-
+        moveList = getMoveList state initMoveStack
+        -- dummy = Debug.log "move list" moveList
     in
-        entities_
+        state
 
-hMoveLetters: Array Entity -> Direction -> TurnProgress -> (TurnProgress, Array Entity)
-hMoveLetters entities direction progress =
+getMoveList: GameState -> List Move -> List Move
+getMoveList state moveStack =
     let
-        remaining = Set.diff progress.canMove progress.hasMoved
+        executedMoves = []
+
+        next prevStack executed =
+            case prevStack of
+                [] -> executed
+                (nextMove::remaining) ->
+                    let
+                        _ = Debug.log "movestack" prevStack
+                        _ = Debug.log "executed" executed
+                        (isValid, movableTarget) = moveValid state nextMove
+
+                        prependedMove = case movableTarget of
+                                            Just t -> Just (Move t.ix nextMove.direction)
+                                            Nothing -> Nothing
+                        _ = Debug.log "prependedMove" prependedMove
+
+                        moveStack_ = case prependedMove of
+                                         Just pm ->
+                                             let
+                                                 deleted = List.filter (\m -> m.entityIx /= pm.entityIx) prevStack
+                                                 _ = Debug.log "deleted " deleted
+                                             in pm::deleted
+                                         Nothing -> remaining
+                        _ = Debug.log "movestack'" prevStack
+                        _ = Debug.log "movestack'" remaining
+
+                        executedMove = case prependedMove of
+                                           Just pm -> []
+                                           Nothing ->
+                                               if isValid then [nextMove] else []
+
+                        executed_ = executed ++ executedMove
+
+                    in
+                        if List.member nextMove executed
+                        then next remaining executed
+                        else next moveStack_ executed_
+    in next moveStack []
+
+moveValid: GameState -> Move -> (Bool, Maybe Entity)
+moveValid state move =
+    let
+        entity = Array.filter (\e -> e.ix == move.entityIx) state.entities
+               |> Array.toList
+               |> List.head
+
+
+        entityLoc = Maybe.map .location entity
+        targetLoc = Maybe.map (moveCoord move.direction) entityLoc
+        targetEntity = Maybe.andThen (entityAtLocation state.entities) targetLoc
+
+        entityExists = case entity of
+                           Just e -> not e.deleted
+                           Nothing -> False
+
+        entityBlocks eType = case eType of
+                                 Rock -> True
+                                 _ -> False
+
+        targetBlocks = case targetEntity of
+                           Just t -> entityBlocks t.eType
+                           Nothing -> False
+
+        inGrid = case targetLoc of
+                     Just l -> inBounds state.grid l
+                     Nothing -> False
+
+        movableTargetEntity = case targetEntity of
+                                   Just e -> case e.eType of
+                                                 Letter _ -> Just e
+                                                 _ -> Nothing
+                                   Nothing -> Nothing
+
+        canMove = entityExists && not targetBlocks && inGrid
     in
-        if Set.isEmpty remaining then (progress, entities)
-        else
-            let
-                toMoveIndex = case progress.toMoveHint of
-                                    Just ix -> Just ix
-                                    Nothing -> List.head (Set.toList remaining)
-
-                toMoveEntity = Maybe.andThen (\ix -> Array.get ix entities) toMoveIndex
-
-                targetLocation = toMoveEntity
-                               |> Maybe.map .location
-                               |> Maybe.map (moveCoord direction)
-
-                targetEntity = Maybe.andThen (entityAtLocation entities) targetLocation
-                targetIndex  = Maybe.map .ix targetEntity
-
-                targetShouldMove = case targetIndex of
-                                       Just ix -> Set.member ix progress.canMove &&
-                                                  not (Set.member ix progress.hasMoved)
-                                       Nothing -> False
-
-                -- The hasMoved set if the entity did move
-                hasMoved_ = if targetShouldMove then progress.hasMoved
-                            else
-                                case toMoveIndex of
-                                    Just ix -> Set.insert ix progress.hasMoved
-                                    Nothing -> progress.hasMoved
-
-                toMoveHint_ = if targetShouldMove then targetIndex
-                             else Nothing
-
-                progress_ = { progress | hasMoved = hasMoved_, toMoveHint = toMoveHint_ }
-
-                entity_ = if targetShouldMove then toMoveEntity
-                          else
-                              case toMoveEntity of
-                                  Just entity -> Just { entity | location = Maybe.withDefault entity.location targetLocation }
-                                  Nothing -> Nothing
-
-                entities_ = case entity_ of
-                                Just e_ -> Array.set e_.ix e_ entities
-                                Nothing -> entities
-
-            in hMoveLetters entities_ direction progress_
-
-
--- moveEntities: EntityManager -> Direction -> EntityManager
--- moveEntities entityManager direction =
---     let
---         isLetter entity = case entity.eType of
---                               Letter _ -> True
---                               _ -> False
-
---         movable = case entityManager.candied of
---                       Just candied -> candied
---                       Nothing -> List.filter isLetter entityManager.entities
---                               |> List.map .id
-
---         (newEntities, newCandied) = moveEntities_ entityManager.entities direction movable []
---     in
---         { entities = newEntities, candied = newCandied }
-
--- moveEntities_: List Entity -> Direction -> List Int -> List Int -> (List Entity, Maybe (List Int))
--- moveEntities_ entities direction movable candied =
---     case movable of
---         id::_ ->
---             let
---                 matching = List.filter (\e -> e.id == id && e.deleted == False) entities
---                 entity = List.head matching
---                 entityLoc = Maybe.map .location entity
---                 targetLoc = Maybe.map (moveCoord direction) entityLoc
---                 targetEntity = Maybe.andThen (\l -> List.filter (\e -> targetLoc == Just e.location) entities |> List.head)
-
---                 -- otherEntities = List.filter (\e -> e.id /= id) entities
---                 -- newEntity = case targetEntity of
---                 --                 Just t -> 
---                 --                 Nothing ->
-
---             in (entities, Nothing)
---         [] -> (entities, Nothing)
-
+        (canMove, movableTargetEntity)
 
 ----------------
 -- Primatives --
@@ -178,7 +164,6 @@ moveCoord direction coord =
         Left ->  { coord | column = coord.column - 1}
         Right -> { coord | column = coord.column + 1}
 
-
 -------------
 -- Testing --
 -------------
@@ -190,7 +175,6 @@ testGrid = Grid 5 5
 
 testEntities = makeEntities [(Letter 'A', Coordinate 0 0)
                             ,(Letter 'B', Coordinate 0 1)]
-
 initialGameState = GameState testGrid testEntities
 
 showGameState: GameState -> List (List Char)
