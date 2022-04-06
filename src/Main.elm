@@ -57,8 +57,6 @@ updateKeyboard event model =
                        Waiting -> Maybe.map (updateInitialMove model) direction
                                |> Maybe.withDefault model.stage
                        _ -> model.stage
-
-        _ = Debug.log "stage" newStage
     in
         { model | stage = newStage }
 
