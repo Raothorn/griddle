@@ -1,12 +1,13 @@
 module Main exposing (..)
 
 import GameView exposing (..)
-import GameState
+import GameState exposing (..)
 
 import Browser
 import Browser.Events exposing (onKeyDown)
 import Html.Attributes exposing (id, style, tabindex)
 import Html.Events exposing (on)
+import Time
 import Element exposing (..)
 import Json.Decode as Json
 import Keyboard.Event exposing (KeyboardEvent, decodeKeyboardEvent)
@@ -23,6 +24,7 @@ main = Browser.element
 type alias Model = GameState.GameState
 
 type Msg = HandleKeyboardEvent KeyboardEvent
+         | Tick Time.Posix
          | NoOp
 
 init: (Model, Cmd Msg)
@@ -32,29 +34,62 @@ update msg model =
     let
         newModel =
             case msg of
-                HandleKeyboardEvent event ->
-                    let
-                        direction = case event.keyCode of
-                                     Keyboard.S -> Just GameState.Down
-                                     Keyboard.W -> Just GameState.Up
-                                     Keyboard.A -> Just GameState.Left
-                                     Keyboard.D -> Just GameState.Right
-                                     Keyboard.Down -> Just GameState.Down
-                                     Keyboard.Up -> Just GameState.Up
-                                     Keyboard.Left -> Just GameState.Left
-                                     Keyboard.Right -> Just GameState.Right
-                                     _    -> Nothing
-
-                    in case direction of
-                           Just dir -> GameState.updateInitialMove model dir
-                           Nothing -> model
+                HandleKeyboardEvent event -> updateKeyboard event model
+                Tick time -> updateAnim model
                 NoOp -> model
     in ( newModel, Cmd.none )
 
+updateKeyboard: KeyboardEvent -> Model -> Model
+updateKeyboard event model =
+    let
+        direction = case event.keyCode of
+                        Keyboard.S -> Just GameState.Down
+                        Keyboard.W -> Just GameState.Up
+                        Keyboard.A -> Just GameState.Left
+                        Keyboard.D -> Just GameState.Right
+                        Keyboard.Down -> Just GameState.Down
+                        Keyboard.Up -> Just GameState.Up
+                        Keyboard.Left -> Just GameState.Left
+                        Keyboard.Right -> Just GameState.Right
+                        _    -> Nothing
+
+        newStage = case model.stage of
+                       Waiting -> Maybe.map (updateInitialMove model) direction
+                               |> Maybe.withDefault model.stage
+                       _ -> model.stage
+
+        _ = Debug.log "stage" newStage
+    in
+        { model | stage = newStage }
+
+
+updateAnim: Model -> Model
+updateAnim model =
+    let
+        animDuration = 5
+        newModel = case model.stage of
+                       InitialMoveProcessed moveInfo ->
+                           let animStage = Animating { tickCount = 0
+                                                     , duration = animDuration
+                                                     , moveInfo = moveInfo }
+                           in { model | stage = animStage }
+                       Animating info ->
+                           let
+                               updatedState = info.moveInfo.updatedState
+                           in
+                               if info.tickCount < animDuration
+                               then { model | stage = Animating { info | tickCount = info.tickCount + 1 }}
+                               else { updatedState | stage = Waiting }
+                       _ -> model
+    in
+        newModel
 
 subscriptions: Model -> Sub Msg
 subscriptions model =
-    onKeyDown (Json.map HandleKeyboardEvent decodeKeyboardEvent)
+    Sub.batch
+    [ onKeyDown (Json.map HandleKeyboardEvent decodeKeyboardEvent)
+    , Time.every (1000 / 60) Tick
+    ]
 
 view model =
     let

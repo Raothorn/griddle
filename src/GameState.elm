@@ -6,8 +6,19 @@ import Set exposing (..)
 type alias GameState =
     { grid: Grid
     , entities: Array Entity
-    , turnStage: TurnStage
+    , stage: Stage
     }
+
+type alias MoveInfo =
+    { updatedState: GameState
+    , moveDirection: Direction
+    , movedLetters: List Int
+    }
+
+type Stage = Waiting
+           | InputReceived { moveDirection: Direction}
+           | InitialMoveProcessed MoveInfo
+           | Animating { tickCount: Int, duration: Int, moveInfo: MoveInfo }
 
 ----------
 -- Grid --
@@ -47,29 +58,32 @@ entityAtLocation entities location =
 ----------------
 -- Turn Logic --
 ----------------
-type TurnStage = Waiting
-               | InputReceived
-               | InitialMoveProcessed
-               | InitialMoveAnimated
-
-updateInitialMove: GameState -> Direction -> GameState
+updateInitialMove: GameState -> Direction -> Stage
 updateInitialMove state direction =
     let
         letters = scanLetters state direction
 
         moveLetter letter gs = if moveValid gs letter.ix direction
-                               then { letter | location = moveCoord direction letter.location }
-                               else letter
+                               then ({ letter | location = moveCoord direction letter.location }
+                                    , True)
+                               else (letter, False)
 
-        updateMove: Entity -> GameState -> GameState
-        updateMove letter gs =
+        updateMove: Entity -> (List Int, GameState) -> (List Int, GameState)
+        updateMove letter (moved, gs) =
             let
-                letter_ = moveLetter letter gs
+                (letter_, didMove) = moveLetter letter gs
                 entities_ = Array.set letter.ix letter_ gs.entities
-            in { gs | entities = entities_ }
+                gs_= { gs | entities = entities_ }
+                moved_ = if didMove then letter.ix::moved else moved
+            in
+                (moved_, gs_)
+
+        (movedLetters, state_) = List.foldl updateMove ([], state) letters
 
     in
-        List.foldl updateMove state letters
+        InitialMoveProcessed { updatedState = state_
+                             , moveDirection = direction
+                             , movedLetters = movedLetters }
 
 scanLetters: GameState -> Direction -> List Entity
 scanLetters state direction =
@@ -155,7 +169,7 @@ testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
                             , (Letter 'B', Coordinate 0 1)
                             , (Rock, Coordinate 3 3)
                             ]
-initialGameState = GameState testGrid testEntities
+initialGameState = GameState testGrid testEntities Waiting
 
 showGameState: GameState -> List (List Char)
 showGameState state =
