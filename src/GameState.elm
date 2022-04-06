@@ -17,8 +17,9 @@ type alias MoveInfo =
 
 type Stage = Waiting
            | InputReceived { moveDirection: Direction}
-           | InitialMoveProcessed MoveInfo
+           | MoveProcessed MoveInfo
            | Animating { tickCount: Int, duration: Int, moveInfo: MoveInfo }
+           | FinishedAnimating
 
 ----------
 -- Grid --
@@ -81,9 +82,33 @@ updateInitialMove state direction =
         (movedLetters, state_) = List.foldl updateMove ([], state) letters
 
     in
-        InitialMoveProcessed { updatedState = state_
+        MoveProcessed { updatedState = state_
                              , moveDirection = direction
                              , movedLetters = movedLetters }
+
+updateResolveMove: GameState -> Stage
+updateResolveMove state =
+    let
+        isBelt entity = case entity.eType of
+                            Belt _ -> True
+                            _ -> False
+
+        isLetter entity = case entity.eType of
+                              Letter _ -> True
+                              _ -> False
+
+        beltLocations = Array.filter isBelt state.entities
+                      |> Array.map .location
+                      |> Array.toList
+
+        lettersOnBelts = Array.filter
+                         (\e -> isLetter e && List.member e.location beltLocations)
+                         state.entities
+                       |> Array.toList
+
+        _ = Debug.log "belt letters: " lettersOnBelts
+    in
+        Waiting
 
 scanLetters: GameState -> Direction -> List Entity
 scanLetters state direction =

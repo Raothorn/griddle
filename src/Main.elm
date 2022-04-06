@@ -66,7 +66,7 @@ updateAnim model =
     let
         animDuration = 5
         newModel = case model.stage of
-                       InitialMoveProcessed moveInfo ->
+                       MoveProcessed moveInfo ->
                            let animStage = Animating { tickCount = 0
                                                      , duration = animDuration
                                                      , moveInfo = moveInfo }
@@ -77,7 +77,9 @@ updateAnim model =
                            in
                                if info.tickCount < animDuration
                                then { model | stage = Animating { info | tickCount = info.tickCount + 1 }}
-                               else { updatedState | stage = Waiting }
+                               else { updatedState | stage = FinishedAnimating }
+
+                       FinishedAnimating -> { model | stage = updateResolveMove model }
                        _ -> model
     in
         newModel
