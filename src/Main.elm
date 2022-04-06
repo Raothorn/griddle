@@ -7,7 +7,7 @@ import Browser
 import Browser.Events exposing (onKeyDown)
 import Html.Attributes exposing (id, style, tabindex)
 import Html.Events exposing (on)
-import Element
+import Element exposing (..)
 import Json.Decode as Json
 import Keyboard.Event exposing (KeyboardEvent, decodeKeyboardEvent)
 import Keyboard.Key as Keyboard
@@ -39,6 +39,10 @@ update msg model =
                                      Keyboard.W -> Just GameState.Up
                                      Keyboard.A -> Just GameState.Left
                                      Keyboard.D -> Just GameState.Right
+                                     Keyboard.Down -> Just GameState.Down
+                                     Keyboard.Up -> Just GameState.Up
+                                     Keyboard.Left -> Just GameState.Left
+                                     Keyboard.Right -> Just GameState.Right
                                      _    -> Nothing
 
                     in case direction of
@@ -56,4 +60,10 @@ view model =
     let
         edges = {top = True, bottom = False, left = True, right = False }
     in
-        Element.layout [] <| gameview model
+        Element.layout [centerX, centerY] <|
+            Element.column []
+                [ Element.textColumn [spacing 10, padding 10 ]
+                      [ paragraph [] [ text "WASD or arrow keys to move" ]
+                      ]
+                , el [Element.alignLeft] (gameview model)
+                ]

@@ -1,6 +1,6 @@
 module GameView exposing (..)
 
-import Element exposing (Element, el, text, width, height, px, centerX, centerY)
+import Element exposing (..)
 import Element.Border as Border
 import GameState exposing (..)
 
@@ -18,11 +18,18 @@ gameview state =
                 right = coord.column == state.grid.rows - 1
             in {top = top, bottom = bottom, left = left, right = right}
 
+        rockUrl = "https://www.seekpng.com/png/full/396-3967087_rock-goron-mask-pixel-art.png"
+        imgAttr = [width (px 40), height (px 40)]
+        charToElement ch = case ch of
+                               '%' -> image imgAttr
+                                      {src = rockUrl, description = "rock"}
+                               _ -> text (String.fromChar ch)
+
         gridRow: Int -> List Char -> Element msg
         gridRow rowIx row = List.indexedMap
                             (\colIx ch -> gridTile
                                           (getEdges (Coordinate rowIx colIx))
-                                          (text (String.fromChar ch)))
+                                          (charToElement ch))
                             row
                           |> Element.row []
 

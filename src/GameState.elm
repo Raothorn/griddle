@@ -78,14 +78,11 @@ scanLetters state direction =
         scanRow rowIx = Array.filter (\e -> isLetter e && e.location.row == rowIx) state.entities    |> Array.toList
         scanCol colIx = Array.filter (\e -> isLetter e && e.location.column == colIx) state.entities |> Array.toList
 
-        scan: (Int -> List Entity) -> List Int -> List (List Entity)
-        scan scanner range = List.map scanner range
-
         scanned = case direction of
-                      Up -> scan scanRow rowIxs
-                      Down -> scan scanRow (List.reverse rowIxs)
-                      Left -> scan scanCol colIxs
-                      Right -> scan scanCol (List.reverse colIxs)
+                      Up -> List.map scanRow rowIxs
+                      Down -> List.map scanRow (List.reverse rowIxs)
+                      Left -> List.map scanCol colIxs
+                      Right -> List.map scanCol (List.reverse colIxs)
     in
         List.concat scanned
 
