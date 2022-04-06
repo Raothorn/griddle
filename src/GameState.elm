@@ -46,78 +46,59 @@ entityAtLocation entities location =
 ----------------
 -- Turn Logic --
 ----------------
-type alias Move =
-    { entityIx: Int
-    , direction: Direction
-    }
-
 update: GameState -> Direction -> GameState
 update state direction =
     let
+        letters = scanLetters state direction
+
+        moveLetter letter gs = if moveValid gs letter.ix direction
+                               then { letter | location = moveCoord direction letter.location }
+                               else letter
+
+        updateMove: Entity -> GameState -> GameState
+        updateMove letter gs =
+            let
+                letter_ = moveLetter letter gs
+                entities_ = Array.set letter.ix letter_ gs.entities
+            in { gs | entities = entities_ }
+
+    in
+        List.foldl updateMove state letters
+
+scanLetters: GameState -> Direction -> List Entity
+scanLetters state direction =
+    let
+        rowIxs = List.range 0 (state.grid.rows - 1)
+        colIxs = List.range 0 (state.grid.columns - 1)
+
         isLetter entity = case entity.eType  of
                               Letter _ -> True
                               _ -> False
-        letters = Array.filter isLetter state.entities
-        initMoveStack = Array.map (\e -> Move e.ix direction) letters
-                      |> Array.toList
 
-        moveList = getMoveList state initMoveStack
-        -- dummy = Debug.log "move list" moveList
+        scanRow rowIx = Array.filter (\e -> isLetter e && e.location.row == rowIx) state.entities    |> Array.toList
+        scanCol colIx = Array.filter (\e -> isLetter e && e.location.column == colIx) state.entities |> Array.toList
+
+        scan: (Int -> List Entity) -> List Int -> List (List Entity)
+        scan scanner range = List.map scanner range
+
+        scanned = case direction of
+                      Up -> scan scanRow rowIxs
+                      Down -> scan scanRow (List.reverse rowIxs)
+                      Left -> scan scanCol colIxs
+                      Right -> scan scanCol (List.reverse colIxs)
     in
-        state
+        List.concat scanned
 
-getMoveList: GameState -> List Move -> List Move
-getMoveList state moveStack =
+
+moveValid: GameState -> Int -> Direction -> Bool
+moveValid state entityIx direction =
     let
-        executedMoves = []
-
-        next prevStack executed =
-            case prevStack of
-                [] -> executed
-                (nextMove::remaining) ->
-                    let
-                        _ = Debug.log "movestack" prevStack
-                        _ = Debug.log "executed" executed
-                        (isValid, movableTarget) = moveValid state nextMove
-
-                        prependedMove = case movableTarget of
-                                            Just t -> Just (Move t.ix nextMove.direction)
-                                            Nothing -> Nothing
-                        _ = Debug.log "prependedMove" prependedMove
-
-                        moveStack_ = case prependedMove of
-                                         Just pm ->
-                                             let
-                                                 deleted = List.filter (\m -> m.entityIx /= pm.entityIx) prevStack
-                                                 _ = Debug.log "deleted " deleted
-                                             in pm::deleted
-                                         Nothing -> remaining
-                        _ = Debug.log "movestack'" prevStack
-                        _ = Debug.log "movestack'" remaining
-
-                        executedMove = case prependedMove of
-                                           Just pm -> []
-                                           Nothing ->
-                                               if isValid then [nextMove] else []
-
-                        executed_ = executed ++ executedMove
-
-                    in
-                        if List.member nextMove executed
-                        then next remaining executed
-                        else next moveStack_ executed_
-    in next moveStack []
-
-moveValid: GameState -> Move -> (Bool, Maybe Entity)
-moveValid state move =
-    let
-        entity = Array.filter (\e -> e.ix == move.entityIx) state.entities
+        entity = Array.filter (\e -> e.ix == entityIx) state.entities
                |> Array.toList
                |> List.head
 
-
         entityLoc = Maybe.map .location entity
-        targetLoc = Maybe.map (moveCoord move.direction) entityLoc
+        targetLoc = Maybe.map (moveCoord direction) entityLoc
         targetEntity = Maybe.andThen (entityAtLocation state.entities) targetLoc
 
         entityExists = case entity of
@@ -126,6 +107,7 @@ moveValid state move =
 
         entityBlocks eType = case eType of
                                  Rock -> True
+                                 Letter _ -> True
                                  _ -> False
 
         targetBlocks = case targetEntity of
@@ -136,15 +118,8 @@ moveValid state move =
                      Just l -> inBounds state.grid l
                      Nothing -> False
 
-        movableTargetEntity = case targetEntity of
-                                   Just e -> case e.eType of
-                                                 Letter _ -> Just e
-                                                 _ -> Nothing
-                                   Nothing -> Nothing
-
-        canMove = entityExists && not targetBlocks && inGrid
     in
-        (canMove, movableTargetEntity)
+        entityExists && not targetBlocks && inGrid
 
 ----------------
 -- Primatives --
@@ -173,8 +148,10 @@ makeEntities entities = List.indexedMap (\ix (t, l) -> Entity ix t l False) enti
 
 testGrid = Grid 5 5
 
-testEntities = makeEntities [(Letter 'A', Coordinate 0 0)
-                            ,(Letter 'B', Coordinate 0 1)]
+testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
+                            , (Letter 'B', Coordinate 0 1)
+                            , (Rock, Coordinate 3 3)
+                            ]
 initialGameState = GameState testGrid testEntities
 
 showGameState: GameState -> List (List Char)
@@ -188,6 +165,7 @@ showGameState state =
             let
                 eChar = case entity.eType of
                             Letter ch -> ch
+                            Rock -> '%'
                             _ -> ' '
 
                 oldRow = Array.get entity.location.row rows
@@ -203,5 +181,3 @@ showGameState state =
 
         grid = Array.map (Array.toList) gridRows_ |> Array.toList
     in grid
-
-showEntities entities = showGameState (GameState testGrid entities)
