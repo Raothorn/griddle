@@ -6,6 +6,7 @@ import Set exposing (..)
 type alias GameState =
     { grid: Grid
     , entities: Array Entity
+    , turnStage: TurnStage
     }
 
 ----------
@@ -46,8 +47,13 @@ entityAtLocation entities location =
 ----------------
 -- Turn Logic --
 ----------------
-update: GameState -> Direction -> GameState
-update state direction =
+type TurnStage = Waiting
+               | InputReceived
+               | InitialMoveProcessed
+               | InitialMoveAnimated
+
+updateInitialMove: GameState -> Direction -> GameState
+updateInitialMove state direction =
     let
         letters = scanLetters state direction
 

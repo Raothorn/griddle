@@ -46,7 +46,7 @@ update msg model =
                                      _    -> Nothing
 
                     in case direction of
-                           Just dir -> GameState.update model dir
+                           Just dir -> GameState.updateInitialMove model dir
                            Nothing -> model
                 NoOp -> model
     in ( newModel, Cmd.none )
