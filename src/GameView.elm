@@ -26,6 +26,7 @@ gameTiles gamestate =
                     Just e -> case e.eType of
                                   Letter ch -> Text ch
                                   Rock -> Image resources.rockUrl
+                                  Belt _ -> Image resources.beltUrl
                                   _ -> NoContents
                     Nothing -> NoContents
 
@@ -103,7 +104,7 @@ gridTile edges tile =
 
         inner = case tile.contents of
                     Text ch -> text (String.fromChar ch)
-                    Image src -> image [width (px <| tileSize - 10), height (px <| tileSize - 10) ]
+                    Image src -> image [width (px <| tileSize - 5), height (px <| tileSize - 5) ]
                                  { src = src, description = "Image Asset" }
                     _ -> Element.none
 
@@ -117,5 +118,6 @@ gridTile edges tile =
     <| el ([centerX, centerY] ++ innerOffset) inner
 
 resources =
-    { rockUrl = "https://www.seekpng.com/png/full/396-3967087_rock-goron-mask-pixel-art.png"
+    { rockUrl = "../resources/rock.png"
+    , beltUrl = "../resources/belt.png"
     }

@@ -193,7 +193,9 @@ testGrid = Grid 5 5
 testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
                             , (Letter 'B', Coordinate 0 1)
                             , (Rock, Coordinate 3 3)
+                            , (Belt Right, Coordinate 2 1)
                             ]
+
 initialGameState = GameState testGrid testEntities Waiting
 
 showGameState: GameState -> List (List Char)
