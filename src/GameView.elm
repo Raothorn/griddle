@@ -42,10 +42,12 @@ gameTiles gamestate =
                                                     Left ->  (-pxOffset, 0)
                                                     Right -> (pxOffset, 0)
 
+                              move = List.filter (\(ix, dir) -> ix == entity.ix) info.moveInfo.moves
+                                   |> List.head
                           in
-                              if List.member entity.ix info.moveInfo.movedLetters
-                              then offsetInDir info.moveInfo.moveDirection
-                              else (0, 0)
+                              case move of
+                                  Just (_, dir) -> offsetInDir dir
+                                  _ -> (0, 0)
                       _ -> (0,0)
 
             in
