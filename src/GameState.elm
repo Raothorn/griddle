@@ -50,11 +50,10 @@ type alias Entity =
     , deleted: Bool
     }
 
-entityAtLocation: Array Entity -> Coordinate -> Maybe Entity
-entityAtLocation entities location =
+entitiesAtLocation: Array Entity -> Coordinate -> List Entity
+entitiesAtLocation entities location =
     Array.filter (\e -> e.location == location) entities
         |> Array.toList
-        |> List.head
 
 ----------------
 -- Turn Logic --
@@ -141,7 +140,8 @@ moveValid state entityIx direction =
 
         entityLoc = Maybe.map .location entity
         targetLoc = Maybe.map (moveCoord direction) entityLoc
-        targetEntity = Maybe.andThen (entityAtLocation state.entities) targetLoc
+        targetEntity = Maybe.map (entitiesAtLocation state.entities) targetLoc
+                     |> Maybe.andThen List.head 
 
         entityExists = case entity of
                            Just e -> not e.deleted

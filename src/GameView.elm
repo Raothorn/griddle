@@ -2,15 +2,15 @@ module GameView exposing (..)
 
 import Element exposing (..)
 import Element.Border as Border
+import Element.Background as Background
 import GameState exposing (..)
 
 type TileContents = Text Char
                   | Image String
                   | NoContents
 
-type alias Tile = { contents: TileContents
-                  , offset: (Float, Float)
-                  }
+type alias Offset = (Float, Float)
+type alias Tile = List (TileContents, Offset)
 
 tileSize: Int
 tileSize = 50
@@ -18,42 +18,38 @@ tileSize = 50
 gameTiles: GameState -> List (List Tile)
 gameTiles gamestate =
     let
-        getContents coord =
+        getTile coord =
             let
-                entity = entityAtLocation gamestate.entities coord
+                entities = entitiesAtLocation gamestate.entities coord
+
+                entityTileContent entity =
+                    case entity.eType of
+                        Letter ch -> Text ch
+                        Rock -> Image resources.rockUrl
+                        Belt _ -> Image resources.beltUrl
+                        _ -> NoContents
+
+                offset entity =
+                  case gamestate.stage of
+                      Animating info ->
+                          let
+                              offsetPerTick = (toFloat tileSize) / (toFloat info.duration)
+                              pxOffset = offsetPerTick * (toFloat info.tickCount)
+
+                              offsetInDir dir = case dir of
+                                                    Up ->    (0, -pxOffset)
+                                                    Down ->  (0, pxOffset)
+                                                    Left ->  (-pxOffset, 0)
+                                                    Right -> (pxOffset, 0)
+
+                          in
+                              if List.member entity.ix info.moveInfo.movedLetters
+                              then offsetInDir info.moveInfo.moveDirection
+                              else (0, 0)
+                      _ -> (0,0)
+
             in
-                case entity of
-                    Just e -> case e.eType of
-                                  Letter ch -> Text ch
-                                  Rock -> Image resources.rockUrl
-                                  Belt _ -> Image resources.beltUrl
-                                  _ -> NoContents
-                    Nothing -> NoContents
-
-        getOffset coord =
-            case gamestate.stage of
-                Animating info ->
-                    let
-                        entity = entityAtLocation gamestate.entities coord
-
-                        offsetPerTick = (toFloat tileSize) / (toFloat info.duration)
-                        pxOffset = offsetPerTick * (toFloat info.tickCount)
-
-                        offsetInDir dir = case dir of
-                                              Up ->    (0, -pxOffset)
-                                              Down ->  (0, pxOffset)
-                                              Left ->  (-pxOffset, 0)
-                                              Right -> (pxOffset, 0)
-
-                        offset = case entity of
-                                     Just e ->
-                                         if List.member e.ix info.moveInfo.movedLetters
-                                         then offsetInDir info.moveInfo.moveDirection
-                                         else (0, 0)
-                                     Nothing -> (0, 0)
-                    in
-                        offset
-                _ -> (0,0)
+                List.map (\e -> (entityTileContent e, offset e)) entities
 
         coordinates =
             let
@@ -62,7 +58,6 @@ gameTiles gamestate =
             in
                 List.map (\r -> List.map (\c -> Coordinate r c) colList) rowList
 
-        getTile coord = Tile (getContents coord) (getOffset coord)
     in
         List.map (\row -> List.map (\coord -> getTile coord) row) coordinates
 
@@ -102,20 +97,36 @@ gridTile edges tile =
             , right= border edges.right
             }
 
-        inner = case tile.contents of
-                    Text ch -> text (String.fromChar ch)
-                    Image src -> image [width (px <| tileSize - 5), height (px <| tileSize - 5) ]
-                                 { src = src, description = "Image Asset" }
-                    _ -> Element.none
+        imageContent = List.filter
+                       (\(c, _) -> case c of
+                                       Image _ -> True
+                                       _ -> False)
+                       tile
+                     |> List.head
 
-        innerOffset = case tile.offset of
-                          (x, y) -> [moveDown y, moveRight x]
+        letterContent = List.filter
+                       (\(c, _) -> case c of
+                                       Text _ -> True
+                                       _ -> False)
+                       tile
+                      |> List.head
+
+        background = case imageContent of
+                         Just (Image src , _) -> [Background.image src]
+                         _ -> []
+
+
+        (letter, (offX, offY)) = case letterContent of
+                                     Just (Text ch, os) -> (text (String.fromChar ch), os)
+                                     _ -> (text "", (0, 0))
+
+        inner = el [] letter
     in
         el
-        [ Border.widthEach borders
+        ([ Border.widthEach borders
         , width (px 50), height (px 50)
-        ]
-    <| el ([centerX, centerY] ++ innerOffset) inner
+        ] ++ background)
+    <| el ([centerX, centerY, moveRight offX, moveDown offY]) inner
 
 resources =
     { rockUrl = "../resources/rock.png"
