@@ -18,7 +18,7 @@ type alias MoveInfo =
     , moves: List Move
     }
 
-type Stage = Waiting
+type Stage = Waiting {candiedLetters: List Int, eatenCandies: List Int}
            | InputReceived { moveDirection: Direction}
            | MoveProcessed MoveInfo
            | Animating { tickCount: Int, duration: Int, moveInfo: MoveInfo }
@@ -100,31 +100,54 @@ updateMoves moves state =
     in
         List.foldl updateMove ([], state) moves
 
-updateInitialMove: GameState -> Direction -> Stage
-updateInitialMove state direction =
+updateInitialMove: GameState -> List Int -> List Int -> Direction -> Stage
+updateInitialMove state candied eatenCandies direction =
     let
         letters = scanLetters state direction
+
+        canMove ix = if List.isEmpty candied
+                     then True
+                     else List.member ix candied
+
         moveCandidates = List.map2 Tuple.pair
                          (List.map .ix letters)
                          (List.repeat (List.length letters) direction)
+                             |> List.filter (\(ix, _) -> canMove ix)
 
         (moves, state_) = updateMoves moveCandidates state
+
+        entities_ = Array.map
+                    (\e -> if List.member e.ix eatenCandies then { e | deleted = True } else e)
+                    state_.entities
+
+        state__  = { state_ | entities = entities_ }
     in
-        MoveProcessed { updatedState = state_
+        MoveProcessed { updatedState = state__
                       , moves = moves
                       }
 
 updateResolveMove: GameState -> Stage
 updateResolveMove state =
     let
+        -- Annoying helpers (would be nice of case statements could be inline)
         isBelt entity = case entity.eType of
                             Belt _ -> True
+                            _ -> False
+
+
+        isCandy entity = case entity.eType of
+                            Candy -> not entity.deleted
+                            _ -> False
+
+        isLetter entity = case entity.eType of
+                            Letter _ -> True
                             _ -> False
 
         beltDir entity = case entity.eType of
                              Belt dir -> dir
                              _ -> NoDirection
 
+        -- Resolve belts
         beltUnderLetter: Entity -> Maybe (Entity, Entity)
         beltUnderLetter entity = case entity.eType of
                                      Letter _ ->
@@ -135,14 +158,31 @@ updateResolveMove state =
 
         moveCandidates: List (Int, Direction)
         moveCandidates = Array.map beltUnderLetter state.entities
-                       |> Array.toList
-                       |> List.filterMap identity
-                       |> List.map (\(l, b) -> (l.ix, beltDir b))
+                        |> Array.toList
+                        |> List.filterMap identity
+                        |> List.map (\(l, b) -> (l.ix, beltDir b))
 
         (moves, state_) = updateMoves moveCandidates state
+
+        -- Resolve candy
+        candyUnderLetter: Entity -> Maybe (Entity, Entity)
+        candyUnderLetter entity =
+            Array.toList state.entities
+                |> List.map (\e -> if isLetter entity && isCandy e && e.location == entity.location
+                                   then Just (entity, e)
+                                   else Nothing)
+                |> List.filterMap identity
+                |> List.head
+
+        candyLetters = Array.map candyUnderLetter state.entities
+                     |> Array.toList
+                     |> List.filterMap identity
+                     |> List.map (\(l, c) -> (l.ix, c.ix))
+
     in
         case moves of
-            [] -> Waiting
+            [] -> Waiting { candiedLetters = List.map Tuple.first candyLetters
+                          , eatenCandies = List.map Tuple.second candyLetters}
             mvs -> MoveProcessed (MoveInfo state_ moves)
 
 scanLetters: GameState -> Direction -> List Entity
@@ -243,12 +283,19 @@ makeEntities: List (EntityType, Coordinate) -> Array Entity
 makeEntities entities = List.indexedMap (\ix (t, l) -> Entity ix t l False) entities
                       |> Array.fromList
 
-testGrid = Grid 5 5 [Wall VWall 1 4]
+testGrid = Grid 5 5 [Wall VWall 1 2]
 
-testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
-                            , (Letter 'B', Coordinate 0 1)
-                            , (Rock, Coordinate 3 3)
-                            , (Belt Right, Coordinate 2 1)
+testEntities = makeEntities [ (Letter 'Q', Coordinate 1 1)
+                            , (Letter 'U', Coordinate 4 2)
+                            , (Letter 'A', Coordinate 4 4)
+                            , (Letter 'C', Coordinate 2 4)
+                            , (Letter 'K', Coordinate 3 4)
+                            , (Rock, Coordinate 1 0)
+                            , (Rock, Coordinate 1 3)
+                            , (Rock, Coordinate 2 3)
+                            , (Belt Up, Coordinate 3 2)
+                            , (Belt Left, Coordinate 3 3)
+                            , (Candy, Coordinate 2 2)
                             ]
 
-initialGame = GameManager (GameState testGrid testEntities) Waiting
+initialGame = GameManager (GameState testGrid testEntities) (Waiting { candiedLetters = [], eatenCandies = [] })

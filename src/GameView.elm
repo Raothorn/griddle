@@ -24,11 +24,17 @@ gameTiles manager =
                 entities = entitiesAtLocation gamestate.entities coord
 
                 entityTileContent entity =
-                    case entity.eType of
-                        Letter ch -> Text ch
-                        Rock -> Image resources.rockUrl
-                        Belt _ -> Image resources.beltUrl
-                        _ -> NoContents
+                    if entity.deleted
+                    then NoContents
+                    else case entity.eType of
+                             Letter ch -> Text ch
+                             Rock -> Image "../resources/rock.png"
+                             Candy -> Image "../resources/candy.png"
+                             Belt Right -> Image "../resources/belt_right.png"
+                             Belt Left -> Image "../resources/belt_left.png"
+                             Belt Down -> Image "../resources/belt_down.png"
+                             Belt Up -> Image "../resources/belt_up.png"
+                             _ -> NoContents
 
                 offset entity =
                   case manager.stage of
@@ -139,8 +145,3 @@ gridTile edges location grid tile =
         , width (px 50), height (px 50)
         ] ++ background)
     <| el ([centerX, centerY, moveRight offX, moveDown offY]) inner
-
-resources =
-    { rockUrl = "../resources/rock.png"
-    , beltUrl = "../resources/belt.png"
-    }

@@ -54,8 +54,8 @@ updateKeyboard event model =
                         _    -> Nothing
 
         newStage = case model.stage of
-                       Waiting -> Maybe.map (updateInitialMove model.gamestate) direction
-                               |> Maybe.withDefault model.stage
+                       Waiting info -> Maybe.map (updateInitialMove model.gamestate info.candiedLetters info.eatenCandies) direction
+                                    |> Maybe.withDefault model.stage
                        _ -> model.stage
     in
         { model | stage = newStage }
