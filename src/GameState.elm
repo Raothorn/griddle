@@ -30,7 +30,28 @@ type Stage = Waiting
 type alias Grid =
     { rows: Int
     , columns: Int
+    , walls: List Wall
     }
+
+type WallOrientation = VWall | HWall
+
+type alias Wall =
+    { orientation: WallOrientation
+    , along: Int -- Wall lies along left or top (depending on orientation) side of 'along'
+    , between: Int -- Wall spans from between - between + 1
+    }
+
+isEdgeWall: Grid -> Coordinate -> Direction -> Bool
+isEdgeWall grid location edge =
+    let
+        wall = case edge of
+                   Up -> Wall HWall location.row location.column
+                   Down -> Wall HWall (location.row + 1) location.column
+                   Left -> Wall VWall location.row location.column
+                   Right -> Wall VWall location.row (location.column + 1)
+                   _ -> Wall VWall (-1) (-1)
+    in
+        List.member wall grid.walls
 
 inBounds: Grid -> Coordinate -> Bool
 inBounds grid location = location.row >= 0
@@ -176,7 +197,11 @@ moveValid state entityIx direction =
                      Just l -> inBounds state.grid l
                      Nothing -> False
 
-        canMove = (entityExists && not targetBlocks && inGrid)
+        wallBlocks = case entityLoc of
+                         Just l -> isEdgeWall state.grid l direction
+                         Nothing -> False
+
+        canMove = (entityExists && not targetBlocks && not wallBlocks && inGrid)
 
         entity_ = if canMove
                   then case entity of
@@ -218,7 +243,7 @@ makeEntities: List (EntityType, Coordinate) -> Array Entity
 makeEntities entities = List.indexedMap (\ix (t, l) -> Entity ix t l False) entities
                       |> Array.fromList
 
-testGrid = Grid 5 5
+testGrid = Grid 5 5 [Wall VWall 1 4]
 
 testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
                             , (Letter 'B', Coordinate 0 1)

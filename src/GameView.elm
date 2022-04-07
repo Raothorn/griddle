@@ -79,10 +79,14 @@ gameview manager =
                 }
 
         gridRow: Int -> List Tile -> Element msg
-        gridRow rowIx row = List.indexedMap
-                            (\colIx tile -> gridTile (getEdges (Coordinate rowIx colIx)) tile)
-                            row
-                          |> Element.row []
+        gridRow rowIx row =
+            let
+                coord colIx = Coordinate rowIx colIx
+            in
+                List.indexedMap
+                    (\colIx tile -> gridTile (getEdges (coord colIx)) (coord colIx) state.grid tile)
+                        row
+                        |> Element.row []
 
         grid = List.indexedMap gridRow tiles
              |> Element.column []
@@ -90,16 +94,19 @@ gameview manager =
         el [centerX, centerY] grid
 
 
-gridTile: {top: Bool, bottom: Bool, left: Bool, right: Bool}
-        -> Tile -> Element msg
-gridTile edges tile =
+gridTile: {top: Bool, bottom: Bool, left: Bool, right: Bool} -> Coordinate
+        -> Grid -> Tile -> Element msg
+gridTile edges location grid tile =
     let
         border isEdge = if isEdge then 2 else 1
+
+        wallBorder dir = if isEdgeWall grid location dir then 2 else 0
+
         borders =
-            { top = border edges.top
-            , bottom = border edges.bottom
-            , left = border edges.left
-            , right= border edges.right
+            { top = border edges.top + wallBorder Up
+            , bottom = border edges.bottom + wallBorder Down
+            , left = border edges.left + wallBorder Left
+            , right= border edges.right + wallBorder Right
             }
 
         imageContent = List.filter
