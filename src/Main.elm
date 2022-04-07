@@ -64,7 +64,7 @@ updateKeyboard event model =
 updateAnim: Model -> Model
 updateAnim model =
     let
-        animDuration = 5
+        animDuration = 3
         newModel = case model.stage of
                        MoveProcessed moveInfo ->
                            let animStage = Animating { tickCount = 0
