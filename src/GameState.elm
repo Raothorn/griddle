@@ -15,7 +15,7 @@ type alias GameState =
 
 type alias MoveInfo =
     { updatedState: GameState
-    , moves: List (Int, Direction)
+    , moves: List Move
     }
 
 type Stage = Waiting
@@ -61,30 +61,33 @@ entitiesAtLocation entities location =
 ----------------
 -- Turn Logic --
 ----------------
+type alias Move = (Int, Direction)
+
+updateMoves: List Move -> GameState -> (List Move, GameState)
+updateMoves moves state =
+    let
+        updateMove: Move -> (List Move, GameState) -> (List Move, GameState)
+        updateMove move (moved, gs) =
+            let
+                (ix, dir) = move
+                (valid, gs_) = moveValid gs ix dir
+
+                moved_ = if valid then move::moved else moved
+                newState = if valid then gs_ else gs
+            in
+                (moved_, newState)
+    in
+        List.foldl updateMove ([], state) moves
+
 updateInitialMove: GameState -> Direction -> Stage
 updateInitialMove state direction =
     let
         letters = scanLetters state direction
+        moveCandidates = List.map2 Tuple.pair
+                         (List.map .ix letters)
+                         (List.repeat (List.length letters) direction)
 
-        moveLetter letter gs = if moveValid gs letter.ix direction
-                               then ({ letter | location = moveCoord direction letter.location }
-                                    , True)
-                               else (letter, False)
-
-        updateMove: Entity -> (List Int, GameState) -> (List Int, GameState)
-        updateMove letter (moved, gs) =
-            let
-                (letter_, didMove) = moveLetter letter gs
-                entities_ = Array.set letter.ix letter_ gs.entities
-                gs_= { gs | entities = entities_ }
-                moved_ = if didMove then letter.ix::moved else moved
-            in
-                (moved_, gs_)
-
-        (movedLetters, state_) = List.foldl updateMove ([], state) letters
-        moves = List.map2 Tuple.pair movedLetters <|
-                List.repeat (List.length movedLetters) direction
-
+        (moves, state_) = updateMoves moveCandidates state
     in
         MoveProcessed { updatedState = state_
                       , moves = moves
@@ -109,14 +112,17 @@ updateResolveMove state =
                                              |> Array.get 0
                                      _ -> Nothing
 
-        letterBelts: List (Int, Direction)
-        letterBelts = Array.map beltUnderLetter state.entities
-                        |> Array.toList
-                        |> List.filterMap identity
-                        |> List.map (\(l, b) -> (l.ix, beltDir b))
+        moveCandidates: List (Int, Direction)
+        moveCandidates = Array.map beltUnderLetter state.entities
+                       |> Array.toList
+                       |> List.filterMap identity
+                       |> List.map (\(l, b) -> (l.ix, beltDir b))
 
+        (moves, state_) = updateMoves moveCandidates state
     in
-        Waiting
+        case moves of
+            [] -> Waiting
+            mvs -> MoveProcessed (MoveInfo state_ moves)
 
 scanLetters: GameState -> Direction -> List Entity
 scanLetters state direction =
@@ -141,7 +147,7 @@ scanLetters state direction =
         List.concat scanned
 
 
-moveValid: GameState -> Int -> Direction -> Bool
+moveValid: GameState -> Int -> Direction -> (Bool, GameState)
 moveValid state entityIx direction =
     let
         entity = Array.filter (\e -> e.ix == entityIx) state.entities
@@ -171,8 +177,20 @@ moveValid state entityIx direction =
                      Nothing -> False
 
         canMove = (entityExists && not targetBlocks && inGrid)
+
+        entity_ = if canMove
+                  then case entity of
+                           Just e -> Maybe.map (\newLoc -> {e | location = newLoc } ) targetLoc
+                           Nothing -> Nothing
+                  else entity
+
+        entities_ = case entity_ of
+                        Just e_ -> Array.set entityIx e_ state.entities
+                        Nothing -> state.entities
+
+        state_ = { state | entities = entities_ }
     in
-        entityExists && not targetBlocks && inGrid
+        (canMove, state_)
 
 ----------------
 -- Primatives --
