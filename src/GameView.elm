@@ -15,9 +15,10 @@ type alias Tile = List (TileContents, Offset)
 tileSize: Int
 tileSize = 50
 
-gameTiles: GameState -> List (List Tile)
-gameTiles gamestate =
+gameTiles: GameManager -> List (List Tile)
+gameTiles manager =
     let
+        gamestate = manager.gamestate
         getTile coord =
             let
                 entities = entitiesAtLocation gamestate.entities coord
@@ -30,7 +31,7 @@ gameTiles gamestate =
                         _ -> NoContents
 
                 offset entity =
-                  case gamestate.stage of
+                  case manager.stage of
                       Animating info ->
                           let
                               offsetPerTick = (toFloat tileSize) / (toFloat info.duration)
@@ -65,10 +66,11 @@ gameTiles gamestate =
         List.map (\row -> List.map (\coord -> getTile coord) row) coordinates
 
 
-gameview: GameState -> Element msg
-gameview state =
+gameview: GameManager -> Element msg
+gameview manager =
     let
-        tiles = gameTiles state
+        state = manager.gamestate
+        tiles = gameTiles manager
         getEdges coord =
                 { top = coord.row == 0
                 , bottom = coord.row == state.grid.rows - 1

@@ -3,10 +3,14 @@ module GameState exposing (..)
 import Array exposing (..)
 import Set exposing (..)
 
+type alias GameManager =
+    { gamestate: GameState
+    , stage: Stage
+    }
+
 type alias GameState =
     { grid: Grid
     , entities: Array Entity
-    , stage: Stage
     }
 
 type alias MoveInfo =
@@ -204,4 +208,4 @@ testEntities = makeEntities [ (Letter 'A', Coordinate 0 0)
                             , (Belt Right, Coordinate 2 1)
                             ]
 
-initialGameState = GameState testGrid testEntities Waiting
+initialGame = GameManager (GameState testGrid testEntities) Waiting

@@ -21,14 +21,14 @@ main = Browser.element
        , subscriptions = subscriptions
        }
 
-type alias Model = GameState.GameState
+type alias Model = GameState.GameManager
 
 type Msg = HandleKeyboardEvent KeyboardEvent
          | Tick Time.Posix
          | NoOp
 
 init: (Model, Cmd Msg)
-init = (GameState.initialGameState, Cmd.none)
+init = (GameState.initialGame, Cmd.none)
 
 update msg model =
     let
@@ -54,7 +54,7 @@ updateKeyboard event model =
                         _    -> Nothing
 
         newStage = case model.stage of
-                       Waiting -> Maybe.map (updateInitialMove model) direction
+                       Waiting -> Maybe.map (updateInitialMove model.gamestate) direction
                                |> Maybe.withDefault model.stage
                        _ -> model.stage
     in
@@ -77,9 +77,9 @@ updateAnim model =
                            in
                                if info.tickCount < animDuration
                                then { model | stage = Animating { info | tickCount = info.tickCount + 1 }}
-                               else { updatedState | stage = FinishedAnimating }
+                               else { model | gamestate = updatedState, stage = FinishedAnimating }
 
-                       FinishedAnimating -> { model | stage = updateResolveMove model }
+                       FinishedAnimating -> { model | stage = updateResolveMove model.gamestate }
                        _ -> model
     in
         newModel
