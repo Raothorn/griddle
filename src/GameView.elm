@@ -41,6 +41,7 @@ gameTiles gamestate =
                                                     Down ->  (0, pxOffset)
                                                     Left ->  (-pxOffset, 0)
                                                     Right -> (pxOffset, 0)
+                                                    _ -> (0, 0)
 
                               move = List.filter (\(ix, dir) -> ix == entity.ix) info.moveInfo.moves
                                    |> List.head

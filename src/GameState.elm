@@ -93,20 +93,24 @@ updateResolveMove state =
                             Belt _ -> True
                             _ -> False
 
-        isLetter entity = case entity.eType of
-                              Letter _ -> True
-                              _ -> False
+        beltDir entity = case entity.eType of
+                             Belt dir -> dir
+                             _ -> NoDirection
 
-        beltLocations = Array.filter isBelt state.entities
-                      |> Array.map .location
-                      |> Array.toList
+        beltUnderLetter: Entity -> Maybe (Entity, Entity)
+        beltUnderLetter entity = case entity.eType of
+                                     Letter _ ->
+                                         Array.filter (\e -> isBelt e && e.location == entity.location) state.entities
+                                             |> Array.map (\b -> (entity, b))
+                                             |> Array.get 0
+                                     _ -> Nothing
 
-        lettersOnBelts = Array.filter
-                         (\e -> isLetter e && List.member e.location beltLocations)
-                         state.entities
-                       |> Array.toList
+        letterBelts: List (Int, Direction)
+        letterBelts = Array.map beltUnderLetter state.entities
+                        |> Array.toList
+                        |> List.filterMap identity
+                        |> List.map (\(l, b) -> (l.ix, beltDir b))
 
-        _ = Debug.log "belt letters: " lettersOnBelts
     in
         Waiting
 
@@ -128,6 +132,7 @@ scanLetters state direction =
                       Down -> List.map scanRow (List.reverse rowIxs)
                       Left -> List.map scanCol colIxs
                       Right -> List.map scanCol (List.reverse colIxs)
+                      _ -> []
     in
         List.concat scanned
 
@@ -161,13 +166,14 @@ moveValid state entityIx direction =
                      Just l -> inBounds state.grid l
                      Nothing -> False
 
+        canMove = (entityExists && not targetBlocks && inGrid)
     in
         entityExists && not targetBlocks && inGrid
 
 ----------------
 -- Primatives --
 ----------------
-type Direction = Up | Down | Left | Right
+type Direction = Up | Down | Left | Right | NoDirection
 
 type alias Coordinate =
     { row: Int
@@ -181,6 +187,7 @@ moveCoord direction coord =
         Down ->  { coord | row = coord.row + 1}
         Left ->  { coord | column = coord.column - 1}
         Right -> { coord | column = coord.column + 1}
+        NoDirection -> coord
 
 -------------
 -- Testing --
